@@ -23,7 +23,9 @@ In order to do that one requires to forward calls to FreeSWITCH erlang applicati
 This produces a message in form in target erlang node sent to a registered process named `call_sup`: `{get_pid, UUID, Ref, From}`,
 where `UUID` is a call UUID.
 
-`call_sup` process on this message spawns a call handling process (see `src/call.erl`), and requests initial dump of variables.
+`call_sup` process on this message spawns a call handling process (see `src/call.erl`), and requests initial dump of variables
+generating syntetic call event `SYNC` on success.
+
 In spite of all messages sent from `mod_erlang_event` being Erlang strings, this library converts everything to Erlang binaries
 (probably we change `mod_erlang_event` too to communcate binary strings only).
 
