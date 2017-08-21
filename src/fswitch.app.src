@@ -10,8 +10,6 @@
 		gproc
 	]},
 	{modules, [call_sup, call, fswitch, freeswitch]},
-	{mod, { busytone_app, []}},
-	{env, []},
 	{maintainers, ["Roman Galeev"]},
    {licenses, ["GPL"]},
    {links, [{"Github", "https://github.com/jamhed/fswitch"}]}
