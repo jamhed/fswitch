@@ -1,7 +1,7 @@
 Fswitch
 =======
 
-A complimentary Erlang library for FreeSWITCH [`mod_erlang_event`](https://freeswitch.org/confluence/display/FREESWITCH/mod_erlang_event)
+A complimentary Erlang library for FreeSWITCH [mod_erlang_event](https://freeswitch.org/confluence/display/FREESWITCH/mod_erlang_event)
 See supplied [etc/erlang.xml](etc/erlang.xml) as a dialplan example.
 
 Usage
