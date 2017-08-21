@@ -1,16 +1,9 @@
-{application, fswitch,
-[
-	{description, "FreeSWITCH Erlang interface"},
-	{vsn, "1.0.0"},
-	{registered, []},
-	{applications, [
-		kernel,
-		stdlib,
-		lager,
-		gproc
-	]},
-	{modules, [call_sup, call, fswitch, freeswitch]},
-	{maintainers, ["Roman Galeev"]},
-   {licenses, ["GPL"]},
-   {links, [{"Github", "https://github.com/jamhed/fswitch"}]}
-]}.
+{application,fswitch,
+             [{description,"FreeSWITCH Erlang interface"},
+              {vsn,"1.0.1"},
+              {registered,[]},
+              {applications,[kernel,stdlib,lager,gproc]},
+              {modules,[call_sup,call,fswitch,freeswitch]},
+              {maintainers,["Roman Galeev"]},
+              {licenses,["GPL"]},
+              {links,[{"Github","https://github.com/jamhed/fswitch"}]}]}.
