@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<include>
+  <context name="reachme">
+    <extension name="Catch all extension">
+      <condition field="destination_number" expression="^.*$">
+        <action application="set" data="queue=${destination_number}"/>
+        <action application="erlang" data="call_sup:! reach@172.17.0.1"/>
+      </condition>
+    </extension>
+  </context>
+</include>
