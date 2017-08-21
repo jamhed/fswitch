@@ -26,3 +26,8 @@ where `UUID` is a call UUID.
 `call_sup` process on this message spawns a call handling process (see `src/call.erl`), and requests initial dump of variables.
 In spite of all messages sent from `mod_erlang_event` being Erlang strings, this library converts everything to Erlang binaries
 (probably we change `mod_erlang_event` too to communcate binary strings only).
+
+Notes
+=====
+
+This is currently work in progress, and a foundation of SIP functional testing application [busytone](https://github.com/jamhed/busytone).
