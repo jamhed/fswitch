@@ -37,13 +37,13 @@ init([Template]) ->
 
 handle_info({freeswitch_sendmsg, Str}, #state{}=S) ->
 	UUID = erlang:list_to_binary(Str),
-	lager:info("incoming message, uuid:~s", [UUID]),
+	lager:info("~s incoming message", [UUID]),
 	{ok, _Pid} = call:start_link(UUID),
 	{noreply, S};
 
 handle_info({get_pid, Str, Ref, From}, #state{}=S) ->
 	UUID = erlang:list_to_binary(Str),
-	lager:info("call control request, uuid:~s", [UUID]),
+	lager:info("~s control request", [UUID]),
 	CallPid =
 		case call:pid(UUID) of
 			undefined -> {ok, Pid} = call:start_link(UUID), Pid;

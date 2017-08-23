@@ -109,7 +109,7 @@ wait_event_now(Id, Match, Timeout) ->
 sync_state(Pid) when is_pid(Pid) -> Pid ! sync_state.
 
 init([UUID]) ->
-	lager:info("start, uuid:~s", [UUID]),
+	lager:info("~s start", [UUID]),
 	gproc:reg({n, l, {?MODULE, UUID}}),
 	sync_state(self()),
 	{ok, EvLog} = event_log:start_link(),
@@ -154,8 +154,8 @@ handle_cast({bridge, Peer}, S=#state{uuid=UUID}) ->
 	fswitch:api("uuid_bridge ~s ~s", [UUID, Peer]),
 	{noreply, S};
 
-handle_cast(_Msg, S=#state{}) ->
-	lager:error("unhandled cast:~p", [_Msg]),
+handle_cast(_Msg, S=#state{uuid=_UUID}) ->
+	lager:error("~s unhandled cast:~p", [_UUID, _Msg]),
 	{noreply, S}.
 
 % these messages come directly from fs, convert uuid to binary
@@ -183,12 +183,12 @@ handle_info({call_hangup, UUID}, S=#state{uuid=UUID}) ->
 handle_info(sync_state, S=#state{uuid=UUID}) ->
 	maybe_sync_state(fswitch:api("uuid_dump ~s", [UUID]), S);
 
-handle_info({'DOWN', _Ref, process, _Pid, _Reason}, S=#state{}) ->
-	lager:info("owner is dead, pid:~p reason:~p", [_Pid, _Reason]),
+handle_info({'DOWN', _Ref, process, _Pid, _Reason}, S=#state{uuid=_UUID}) ->
+	lager:info("~s owner is dead, pid:~p reason:~p", [_Pid, _Reason]),
 	{stop, normal, S};
 
-handle_info(_Info, S=#state{}) ->
-	lager:error("unhandled info:~p", [_Info]),
+handle_info(_Info, S=#state{uuid=_UUID}) ->
+	lager:error("~s unhandled info:~p", [_UUID, _Info]),
 	{noreply, S}.
 
 handle_call({link_process, Pid}, _From, S=#state{}) ->
@@ -227,12 +227,12 @@ handle_call({wait_event_now, Match}, From, S=#state{ event_log=EvLog }) ->
 	event_log:wait_now(EvLog, Match, From),
 	{noreply, S};
 
-handle_call(_Request, _From, S=#state{}) ->
-	lager:error("unhandled call:~p", [_Request]),
+handle_call(_Request, _From, S=#state{uuid=_UUID}) ->
+	lager:error("~s unhandled call:~p", [_Request]),
 	{reply, ok, S}.
 
 terminate(_Reason, _S=#state{uuid=UUID, wait_hangup=WaitList}) ->
-	lager:info("terminate, uuid:~s reason:~p", [UUID, _Reason]),
+	lager:info("~s terminate, reason:~p", [UUID, _Reason]),
 	fswitch:api("uuid_kill ~s", [UUID]),
 	[ gen_server:reply(Caller, ok) || Caller <- WaitList ],
 	ok.
@@ -262,10 +262,8 @@ set_call_state(S) -> S.
 maybe_set_vairables(Variables, S) when Variables =:= #{} -> S;
 maybe_set_vairables(Variables, S) -> S#state{variables=Variables}.
 
-maybe_debug(<<"SYNC">>=Ev, UUID, Vars) ->
-	lager:info("ev:~s uuid:~s clid:~s", [Ev, UUID, maps:get(<<"Caller-Destination-Number">>, Vars, <<"undefined">>)]);
 maybe_debug(Ev, UUID, Vars) ->
-	lager:debug("ev:~s uuid:~s clid:~s", [Ev, UUID, maps:get(<<"Caller-Destination-Number">>, Vars, <<"undefined">>)]).
+	lager:debug("~s ~s destination-number:~s", [UUID, Ev, maps:get(<<"Caller-Destination-Number">>, Vars, <<"undefined">>)]).
 
 maybe_sync_state({ok, Dump}, S) ->
 	Pairs = fswitch:parse_uuid_dump_string(Dump),
