@@ -177,7 +177,13 @@ handle_info({call, {event,[UUID|Pairs]}}, S=#state{uuid=UUID}) ->
 handle_info({call_hangup, UUID}, S=#state{}) when is_list(UUID) ->
 	handle_info({call_hangup, erlang:list_to_binary(UUID)}, S);
 
-handle_info({call_hangup, UUID}, S=#state{uuid=UUID}) ->
+handle_info({call_hangup, UUID}, S=#state{uuid=UUID, event_log=EvLog, vars=Vars}) ->
+	case event_log:search(EvLog, event_match(<<"CHANNEL_HANGUP">>)) of
+		no_match ->
+			% sometimes this event happens before hangup event, and no events follow, so synthesize it
+			handle_event(Vars#{ <<"Event-Name">> => <<"CHANNEL_HANGUP">> }, #{}, S);
+		_ -> skip
+	end,
 	{stop, normal, S};
 
 handle_info(sync_state, S=#state{uuid=UUID}) ->
@@ -262,6 +268,9 @@ set_call_state(S) -> S.
 maybe_set_vairables(Variables, S) when Variables =:= #{} -> S;
 maybe_set_vairables(Variables, S) -> S#state{variables=Variables}.
 
+
+maybe_debug(<<"CHANNEL_STATE">>=Ev, UUID, Vars) -> lager:info("~s ~s ~p", [UUID, Ev, maps:get(<<"Channel-State">>, Vars)]);
+maybe_debug(<<"CHANNEL_HANGUP">>=Ev, UUID, _Vars) -> lager:info("~s ~s", [UUID, Ev]);
 maybe_debug(Ev, UUID, Vars) ->
 	lager:debug("~s ~s destination-number:~s", [UUID, Ev, maps:get(<<"Caller-Destination-Number">>, Vars, <<"undefined">>)]).
 
