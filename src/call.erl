@@ -190,7 +190,7 @@ handle_info(sync_state, S=#state{uuid=UUID}) ->
 	maybe_sync_state(fswitch:api("uuid_dump ~s", [UUID]), S);
 
 handle_info({'DOWN', _Ref, process, _Pid, _Reason}, S=#state{uuid=_UUID}) ->
-	lager:info("~s owner is dead, pid:~p reason:~p", [_Pid, _Reason]),
+	lager:info("~s owner is dead, pid:~p reason:~p", [_UUID, _Pid, _Reason]),
 	{stop, normal, S};
 
 handle_info(_Info, S=#state{uuid=_UUID}) ->
