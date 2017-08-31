@@ -47,19 +47,16 @@ start_link(UUID) ->
 tuple(UUID) -> {?MODULE, UUID}.
 pid({?MODULE, UUID}) -> pid(UUID);
 pid(UUID) -> gproc:whereis_name({n, l, {?MODULE, UUID}}).
-wait(UUID) -> gproc:await({n, l, {?MODULE, UUID}}), UUID.
+wait(UUID) -> gproc:await({n, l, {?MODULE, UUID}}, 5000), UUID.
 
-subscribe(uuid, UUID) -> gen_safe:subscribe({p, l, {?MODULE, uuid, UUID}});
+subscribe(uuid, UUID) -> gproc:reg({p, l, {?MODULE, uuid, UUID}}, subscribe);
 subscribe(event, L) when is_list(L) -> [ subscribe(event, Ev) || Ev <- L ];
-subscribe(event, Event) -> gen_safe:subscribe({p, l, {?MODULE, event, Event}}).
-
+subscribe(event, Event) -> gproc:reg({p, l, {?MODULE, event, Event}}, subscribe).
 subscribe(both, UUID, L) when is_list(L) -> [ subscribe(both, UUID, Ev) || Ev <- L ];
-subscribe(both, UUID, Event) -> gen_safe:subscribe({p, l, {?MODULE, both, UUID, Event}}).
-
-unsubscribe(uuid, UUID) -> gen_safe:unsubscribe({p, l, {?MODULE, uuid, UUID}});
-unsubscribe(event, Event) -> gen_safe:unsubscribe({p, l, {?MODULE, event, Event}}).
-
-unsubscribe(both, UUID, Event) -> gen_safe:unsubscribe({p, l, {?MODULE, both, UUID, Event}}).
+subscribe(both, UUID, Event) -> gproc:reg({p, l, {?MODULE, both, UUID, Event}}, subscribe).
+unsubscribe(uuid, UUID) -> gproc:unreg({p, l, {?MODULE, uuid, UUID}});
+unsubscribe(event, Event) -> gproc:unreg({p, l, {?MODULE, event, Event}}).
+unsubscribe(both, UUID, Event) -> gproc:unreg({p, l, {?MODULE, both, UUID, Event}}).
 
 vars(Id) -> gen_safe:call(Id, fun pid/1, vars).
 variables(Id) -> gen_safe:call(Id, fun pid/1, variables).
@@ -277,6 +274,7 @@ set_call_state(S) -> S.
 maybe_set_vairables(Variables, S) when Variables =:= #{} -> S;
 maybe_set_vairables(Variables, S) -> S#state{variables=Variables}.
 
+maybe_debug(<<"PLAYBACK_STOP">>=Ev, UUID, _Vars) -> lager:warning("~s ~s", [UUID, Ev]);
 maybe_debug(<<"CHANNEL_STATE">>=Ev, UUID, Vars) -> lager:debug("~s ~s ~s", [UUID, Ev, maps:get(<<"Channel-State">>, Vars)]);
 maybe_debug(<<"CHANNEL_HANGUP">>=Ev, UUID, _Vars) -> lager:debug("~s ~s", [UUID, Ev]);
 maybe_debug(Ev, UUID, Vars) ->
