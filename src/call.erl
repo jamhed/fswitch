@@ -51,11 +51,14 @@ wait(UUID) -> gproc:await({n, l, {?MODULE, UUID}}), UUID.
 
 subscribe(uuid, UUID) -> gen_safe:subscribe({p, l, {?MODULE, uuid, UUID}});
 subscribe(event, L) when is_list(L) -> [ subscribe(event, Ev) || Ev <- L ];
-subscribe(event, Event) -> gen_safe:subscribe({p, l, {?MODULE, event, Event}});
+subscribe(event, Event) -> gen_safe:subscribe({p, l, {?MODULE, event, Event}}).
+
 subscribe(both, UUID, L) when is_list(L) -> [ subscribe(both, UUID, Ev) || Ev <- L ];
-subscribe(both, UUID, Event) -> gen_safe:subscribe({p, l, {?MODULE, both, UUID, Event}});
+subscribe(both, UUID, Event) -> gen_safe:subscribe({p, l, {?MODULE, both, UUID, Event}}).
+
 unsubscribe(uuid, UUID) -> gen_safe:unsubscribe({p, l, {?MODULE, uuid, UUID}});
 unsubscribe(event, Event) -> gen_safe:unsubscribe({p, l, {?MODULE, event, Event}}).
+
 unsubscribe(both, UUID, Event) -> gen_safe:unsubscribe({p, l, {?MODULE, both, UUID, Event}}).
 
 vars(Id) -> gen_safe:call(Id, fun pid/1, vars).
