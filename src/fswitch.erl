@@ -7,8 +7,9 @@
 	parse_uuid_dump/1, parse_uuid_dump_string/1,
 	stringify_opts/1, stringify_opts/2
 ]).
-
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+-define(PING_REPEAT, 1000).
 
 -record(state, {
 	drone,
@@ -26,8 +27,7 @@ execute(UUID, Command, Args) -> gen_server:call(?MODULE, {execute, UUID, Command
 init([FsDrone]) ->
 	Drone = erlang:list_to_atom(FsDrone),
 	lager:notice("start, drone:~p", [Drone]),
-	net_adm:ping(Drone),
-	erlang:monitor_node(Drone, true),
+	self() ! node_check,
 	{ok, #state{jobs=#{}, drone=Drone}}.
 
 handle_cast(_Msg, S=#state{}) ->
@@ -41,8 +41,20 @@ handle_info({Re, Job, _}=Msg, S=#state{jobs=J}) when Re =:= bgok; Re =:= bgerror
 	end,
 	{noreply, S#state{jobs=maps:remove(Job, J)}};
 
+handle_info(node_check, S=#state{drone=Node}) ->
+	case net_adm:ping(Node) of
+		pong ->
+			lager:notice("freeswitch node up:~p", [Node]),
+			erlang:monitor_node(Node, true);
+		_ ->
+			lager:info("freeswitch node is still down:~p", [Node]),
+			erlang:send_after(?PING_REPEAT, self(), node_check)
+		end,
+		{noreply, S};
+
 handle_info({nodedown, Node}, #state{}=S) ->
 	lager:error("freeswitch node down:~p", [Node]),
+	self() ! node_check,
 	{noreply, S};
 
 handle_info(_Info, S=#state{}) ->
