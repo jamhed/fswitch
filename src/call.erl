@@ -10,8 +10,8 @@
 	deflect/2, display/3, getvar/2, hold/1, hold/2, setvar/2, setvar/3, setvars/2, send_dtmf/2, broadcast/2, displace/3,
 	execute/3, playback/2, tone_detect/4, detect_tone/2, stop_detect_tone/1,
 	bridge/2, transfer/2, transfer/3, transfer/4, record/3, command/3,
-	wait_event/2, wait_event/3, wait_event_now/2, wait_event_now/3,
-	active/0, hupall/0, answer/0, match_for/1, notify_uuid/2
+	wait/1, wait_event/2, wait_event/3, wait_event_now/2, wait_event_now/3,
+	active/0, hupall/0, stop/0, answer/0, match_for/1, notify_uuid/2, stop/1
 ]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -31,6 +31,7 @@ active() ->
 
 hupall() -> [ hangup(UUID) || UUID <- active() ].
 answer() -> [ answer(UUID) || UUID <- active() ].
+stop() -> [ stop(UUID) || UUID <- active() ].
 
 match_for(Map) when is_map(Map) ->
 	Q = qlc:q([ UUID || {{n,l,{?MODULE,UUID}}, _Pid, M} <- gproc:table({l, n}), util_core:match_maps(Map, M) ]),
@@ -46,6 +47,7 @@ start_link(UUID) ->
 tuple(UUID) -> {?MODULE, UUID}.
 pid({?MODULE, UUID}) -> pid(UUID);
 pid(UUID) -> gproc:whereis_name({n, l, {?MODULE, UUID}}).
+wait(UUID) -> gproc:await({n, l, {?MODULE, UUID}}), UUID.
 
 subscribe(uuid, UUID) -> gproc:reg({p, l, {?MODULE, uuid, UUID}}, subscribe);
 subscribe(event, L) when is_list(L) -> [ subscribe(event, Ev) || Ev <- L ];
@@ -60,6 +62,7 @@ vars(Id) -> gen_safe:call(Id, fun pid/1, vars).
 variables(Id) -> gen_safe:call(Id, fun pid/1, variables).
 
 hangup(Id) -> gen_safe:cast(Id, fun pid/1, hangup).
+stop(Id) -> gen_safe:cast(Id, fun pid/1, stop).
 answer(Id) -> gen_safe:cast(Id, fun pid/1, answer).
 park(Id) -> gen_safe:cast(Id, fun pid/1, park).
 break(Id) -> gen_safe:cast(Id, fun pid/1, break).
@@ -127,6 +130,9 @@ handle_cast({command, Command, Args}, S=#state{uuid=UUID}) ->
 handle_cast(hangup, S=#state{uuid=UUID}) ->
 	fswitch:api("uuid_kill ~s", [UUID]),
 	{noreply, S};
+handle_cast(stop, S=#state{}) ->
+	{stop, normal, S};
+
 % doesn't work?
 handle_cast({tone_detect, Name, Tone, Timeout}, S=#state{uuid=UUID}) ->
 	fswitch:api("tone_detect ~s ~s ~s r +~p stop_tone_detect '' 1", [UUID, Name, Tone, Timeout]),

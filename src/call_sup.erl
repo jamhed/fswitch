@@ -18,7 +18,9 @@ start_link() -> start_link("~s").
 start_link(Template) ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [Template], []).
 
-originate(Url, Exten, Opts) -> gen_server:call(?MODULE, {originate, Url, Exten, Opts}).
+originate(Url, Exten, Opts) ->
+	UUID = gen_server:call(?MODULE, {originate, Url, Exten, Opts}),
+	call:wait(UUID).
 originate(Url, Opts) -> originate(Url, self_exten(), Opts).
 originate(Url) -> originate(Url, []).
 
