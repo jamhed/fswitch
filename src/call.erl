@@ -274,7 +274,6 @@ set_call_state(S) -> S.
 maybe_set_vairables(Variables, S) when Variables =:= #{} -> S;
 maybe_set_vairables(Variables, S) -> S#state{variables=Variables}.
 
-maybe_debug(<<"PLAYBACK_STOP">>=Ev, UUID, _Vars) -> lager:warning("~s ~s", [UUID, Ev]);
 maybe_debug(<<"CHANNEL_STATE">>=Ev, UUID, Vars) -> lager:debug("~s ~s ~s", [UUID, Ev, maps:get(<<"Channel-State">>, Vars)]);
 maybe_debug(<<"CHANNEL_HANGUP">>=Ev, UUID, _Vars) -> lager:debug("~s ~s", [UUID, Ev]);
 maybe_debug(Ev, UUID, Vars) ->
