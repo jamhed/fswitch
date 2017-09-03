@@ -19,8 +19,6 @@
 -record(state, {
 	call_state,
 	uuid,
-	vars,
-	variables,
 	wait_hangup = [],
 	event_log
 }).
@@ -183,10 +181,11 @@ handle_info({call, {event,[UUID|Pairs]}}, S=#state{uuid=UUID}) ->
 handle_info({call_hangup, UUID}, S=#state{}) when is_list(UUID) ->
 	handle_info({call_hangup, erlang:list_to_binary(UUID)}, S);
 
-handle_info({call_hangup, UUID}, S=#state{uuid=UUID, event_log=EvLog, vars=Vars}) ->
+handle_info({call_hangup, UUID}, S=#state{uuid=UUID, event_log=EvLog}) ->
 	case event_log:search(EvLog, event_match(<<"CHANNEL_HANGUP">>)) of
 		no_match ->
 			% sometimes this event happens before hangup event, and no events follow, so synthesize it
+			Vars = call_sup:vars(UUID),
 			handle_event(Vars#{ <<"Event-Name">> => <<"CHANNEL_HANGUP">> }, #{}, S);
 		_ -> skip
 	end,
@@ -207,8 +206,8 @@ handle_call({link_process, Pid}, _From, S=#state{}) ->
 	erlang:monitor(process, Pid),
 	{reply, self(), S};
 
-handle_call(vars, _From, S=#state{vars = Vars}) -> {reply, Vars, S};
-handle_call(variables, _From, S=#state{variables = Variables}) -> {reply, Variables, S};
+handle_call(vars, _From, S=#state{uuid=UUID}) -> {reply, call_sup:vars(UUID), S};
+handle_call(variables, _From, S=#state{uuid=UUID}) -> {reply, call_sup:variables(UUID), S};
 
 handle_call({deflect, Target}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_deflect ~s ~s", [UUID, Target]), S};
 handle_call({display, Name, Number}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_display ~s ~s|~s", [UUID, Name, Number]), S};
@@ -246,6 +245,7 @@ handle_call(_Request, _From, S=#state{uuid=_UUID}) ->
 terminate(_Reason, _S=#state{uuid=UUID, wait_hangup=WaitList}) ->
 	lager:info("~s terminate, reason:~p", [UUID, _Reason]),
 	fswitch:api("uuid_kill ~s", [UUID]),
+	call_sup:on_hangup(UUID),
 	[ gen_server:reply(Caller, ok) || Caller <- WaitList ],
 	ok.
 
@@ -254,25 +254,23 @@ code_change(_OldVsn, S=#state{}, _Extra) -> {ok, S}.
 handle_event(Vars = #{ <<"Event-Name">> := Ev }, Variables, S=#state{uuid=UUID, event_log=EvLog}) ->
 	maybe_debug(Ev, UUID, Vars),
 	notify_uuid(UUID, Ev),
-	notify_event(UUID, Ev, Vars),
+	notify_event(UUID, Ev),
 	case event_log:add(EvLog, Vars) of
 		{match, Caller, {Ts, Msg}} -> gen_server:reply(Caller, {match, Ts, Msg});
 		_ -> skip
 	end,
-	{noreply, set_call_state(maybe_set_vairables(Variables, S#state{vars=Vars}))}.
+	call_sup:set(UUID, Vars, Variables),
+	{noreply, set_call_state(Vars, S)}.
 
 notify_uuid(UUID, Ev) ->
 	gproc:send({p, l, {?MODULE, uuid, UUID}}, {?MODULE, UUID, Ev}).
 
-notify_event(UUID, Ev, Vars) ->
-	gproc:send({p, l, {?MODULE, both, UUID, Ev}}, {?MODULE, UUID, Ev, Vars}),
-	gproc:send({p, l, {?MODULE, event, Ev}}, {?MODULE, UUID, Vars}).
+notify_event(UUID, Ev) ->
+	gproc:send({p, l, {?MODULE, both, UUID, Ev}}, {?MODULE, UUID, Ev}),
+	gproc:send({p, l, {?MODULE, event, Ev}}, {?MODULE, UUID, Ev}).
 
-set_call_state(S=#state{ vars = #{ <<"Channel-Call-State">> := State } }) -> S#state{ call_state = State };
-set_call_state(S) -> S.
-
-maybe_set_vairables(Variables, S) when Variables =:= #{} -> S;
-maybe_set_vairables(Variables, S) -> S#state{variables=Variables}.
+set_call_state(#{ <<"Channel-Call-State">> := State }, S) -> S#state{ call_state = State };
+set_call_state(_, S) -> S.
 
 maybe_debug(<<"CHANNEL_STATE">>=Ev, UUID, Vars) -> lager:debug("~s ~s ~s", [UUID, Ev, maps:get(<<"Channel-State">>, Vars)]);
 maybe_debug(<<"CHANNEL_HANGUP">>=Ev, UUID, _Vars) -> lager:debug("~s ~s", [UUID, Ev]);

@@ -4,12 +4,14 @@
 % accept and distribute to proper processes fs calls, either inbound or outbound
 
 -export([
-	start_link/0, start_link/1, create_uuid/0, originate/3, originate/2, originate/1, wait_call/0
+	start_link/0, start_link/1, create_uuid/0, originate/3, originate/2, originate/1, wait_call/0,
+	set/3, vars/1, variables/1, get/1, on_hangup/1
 ]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
+	call_data,
 	jobs,
 	template
 }).
@@ -17,6 +19,12 @@
 start_link() -> start_link("~s").
 start_link(Template) ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [Template], []).
+
+set(UUID, Vars, Variables) -> gen_server:call(?MODULE, {set, UUID, Vars, Variables}).
+get(UUID) -> gen_server:call(?MODULE, {get, UUID}).
+vars(UUID) -> gen_server:call(?MODULE, {get, UUID}).
+variables(UUID) -> gen_server:call(?MODULE, {get, UUID}).
+on_hangup(UUID) -> gen_server:call(?MODULE, {on_hangup, UUID}).
 
 originate(Url, Exten, Opts) ->
 	UUID = gen_server:call(?MODULE, {originate, Url, Exten, Opts}),
@@ -35,7 +43,8 @@ wait_call() ->
 	end.
 
 init([Template]) ->
-	{ok, #state{jobs=#{}, template=Template}}.
+	{ok, Pid} = call_data:start_link(),
+	{ok, #state{jobs=#{}, template=Template, call_data=Pid}}.
 
 handle_info({freeswitch_sendmsg, Str}, #state{}=S) ->
 	UUID = erlang:list_to_binary(Str),
@@ -80,6 +89,26 @@ handle_call({originate, URL, Exten, Opts}, _From, S=#state{template=T, jobs=J}) 
 	]),
 	{ok, Job} = fswitch:bgapi("originate ~s~s ~s", [fswitch:stringify_opts(Opts1, curly), template(T, URL), Exten]),
 	{reply, UUID, S#state{ jobs = J#{ Job => UUID } }};
+
+handle_call({set, UUID, Vars, Variables}, _From, S=#state{call_data=Pid}) ->
+	Re = call_data:set(Pid, UUID, Vars, Variables),
+	{reply, Re, S};
+
+handle_call({get, UUID}, _From, S=#state{call_data=Pid}) ->
+	Re = call_data:get(Pid, UUID),
+	{reply, Re, S};
+
+handle_call({vars, UUID}, _From, S=#state{call_data=Pid}) ->
+	Re = call_data:vars(Pid, UUID),
+	{reply, Re, S};
+
+handle_call({variables, UUID}, _From, S=#state{call_data=Pid}) ->
+	Re = call_data:variables(Pid, UUID),
+	{reply, Re, S};
+
+handle_call({on_hangup, UUID}, _From, S=#state{call_data=Pid}) ->
+	Re = call_data:on_hangup(Pid, UUID),
+	{reply, Re, S};
 
 handle_call(_Request, _From, S=#state{}) ->
 	lager:error("unhandled call:~p", [_Request]),
