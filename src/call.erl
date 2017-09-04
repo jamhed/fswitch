@@ -1,5 +1,6 @@
 -module(call).
 -behaviour(gen_server).
+-include_lib("fswitch/include/fswitch.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([
@@ -254,7 +255,7 @@ code_change(_OldVsn, S=#state{}, _Extra) -> {ok, S}.
 handle_event(Vars = #{ <<"Event-Name">> := Ev }, Variables, S=#state{uuid=UUID, event_log=EvLog}) ->
 	maybe_debug(Ev, UUID, Vars),
 	notify_uuid(UUID, Ev),
-	notify_event(UUID, Ev),
+	notify_event(UUID, Ev, Vars),
 	case event_log:add(EvLog, Vars) of
 		{match, Caller, {Ts, Msg}} -> gen_server:reply(Caller, {match, Ts, Msg});
 		_ -> skip
@@ -263,11 +264,11 @@ handle_event(Vars = #{ <<"Event-Name">> := Ev }, Variables, S=#state{uuid=UUID, 
 	{noreply, set_call_state(Vars, S)}.
 
 notify_uuid(UUID, Ev) ->
-	gproc:send({p, l, {?MODULE, uuid, UUID}}, {?MODULE, UUID, Ev}).
+	gproc:send({p, l, {?MODULE, uuid, UUID}}, #call_event{uuid=UUID, event=Ev}).
 
-notify_event(UUID, Ev) ->
-	gproc:send({p, l, {?MODULE, both, UUID, Ev}}, {?MODULE, UUID, Ev}),
-	gproc:send({p, l, {?MODULE, event, Ev}}, {?MODULE, UUID, Ev}).
+notify_event(UUID, Ev, Vars) ->
+	gproc:send({p, l, {?MODULE, both, UUID, Ev}}, #call_event{uuid=UUID, event=Ev, vars=Vars}),
+	gproc:send({p, l, {?MODULE, event, Ev}}, #call_event{uuid=UUID, event=Ev, vars=Vars}).
 
 set_call_state(#{ <<"Channel-Call-State">> := State }, S) -> S#state{ call_state = State };
 set_call_state(_, S) -> S.
