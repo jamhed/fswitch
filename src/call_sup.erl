@@ -1,4 +1,5 @@
 -module(call_sup).
+-include_lib("fswitch/include/fswitch.hrl").
 -behaviour(gen_server).
 
 % accept and distribute to proper processes fs calls, either inbound or outbound
@@ -37,7 +38,7 @@ self_exten() -> io_lib:format("&erlang('~s:! ~s')", [?MODULE, node()]).
 wait_call() ->
 	call:subscribe(event, <<"SYNC">>),
 	receive
-		{call, _UUID, Map} -> Map
+		#call_event{vars=Vars} -> Vars
 	after
 		5000 -> erlang:error(timeout)
 	end.
