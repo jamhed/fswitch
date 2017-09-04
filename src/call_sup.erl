@@ -23,13 +23,11 @@ start_link(Template) ->
 
 set(UUID, Vars, Variables) -> gen_server:call(?MODULE, {set, UUID, Vars, Variables}).
 get(UUID) -> gen_server:call(?MODULE, {get, UUID}).
-vars(UUID) -> gen_server:call(?MODULE, {get, UUID}).
-variables(UUID) -> gen_server:call(?MODULE, {get, UUID}).
+vars(UUID) -> gen_server:call(?MODULE, {vars, UUID}).
+variables(UUID) -> gen_server:call(?MODULE, {variables, UUID}).
 on_hangup(UUID) -> gen_server:call(?MODULE, {on_hangup, UUID}).
 
-originate(Url, Exten, Opts) ->
-	UUID = gen_server:call(?MODULE, {originate, Url, Exten, Opts}),
-	call:wait(UUID).
+originate(Url, Exten, Opts) -> gen_server:call(?MODULE, {originate, Url, Exten, Opts}).
 originate(Url, Opts) -> originate(Url, self_exten(), Opts).
 originate(Url) -> originate(Url, []).
 
@@ -55,7 +53,7 @@ handle_info({freeswitch_sendmsg, Str}, #state{}=S) ->
 
 handle_info({get_pid, Str, Ref, From}, #state{}=S) ->
 	UUID = erlang:list_to_binary(Str),
-	lager:info("~s control request", [UUID]),
+	lager:debug("~s control request", [UUID]),
 	CallPid =
 		case call:pid(UUID) of
 			undefined -> {ok, Pid} = call:start_link(UUID), Pid;
