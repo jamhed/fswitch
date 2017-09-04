@@ -14,7 +14,7 @@ explode([K|Rest], V, M) -> M#{ K => explode(Rest, V, maps:get(K, M, #{})) }.
 
 match_maps(_, undefined) -> false;
 match_maps(Inner, Outer) ->
-	L = flatten(maps:to_list(Inner)) -- flatten(maps:to_list(Outer)),
+	L = flatten(Inner) -- flatten(Outer),
 	case erlang:length(L) of
 		0 -> true;
 		_N -> false
