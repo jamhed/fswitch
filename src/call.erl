@@ -186,7 +186,7 @@ handle_info({call_hangup, UUID}, S=#state{uuid=UUID, event_log=EvLog}) ->
 	case event_log:search(EvLog, event_match(<<"CHANNEL_HANGUP">>)) of
 		no_match ->
 			% sometimes this event happens before hangup event, and no events follow, so synthesize it
-			Vars = call_sup:vars(UUID),
+			[Vars] = call_sup:vars(UUID),
 			handle_event(Vars#{ <<"Event-Name">> => <<"CHANNEL_HANGUP">> }, #{}, S);
 		_ -> skip
 	end,
