@@ -10,7 +10,7 @@
 	hangup/1, answer/1, park/1, break/1,
 	deflect/2, display/3, getvar/2, hold/1, hold/2, setvar/2, setvar/3, setvars/2, send_dtmf/2, broadcast/2, displace/3,
 	execute/3, playback/2, tone_detect/4, detect_tone/2, stop_detect_tone/1,
-	bridge/2, transfer/2, transfer/3, transfer/4, record/3, command/3,
+	bridge/2, transfer/2, transfer/3, transfer/4, record/3,
 	wait/1, wait_event/2, wait_event/3, wait_event_now/2, wait_event_now/3,
 	active/0, hupall/0, stop/0, answer/0, match_for/1, notify_uuid/2, stop/1
 ]).
@@ -76,7 +76,6 @@ playback(Id, Tone) -> gen_safe:cast(Id, fun pid/1, {playback, Tone}).
 bridge(Id, UUID) -> gen_safe:cast(Id, fun pid/1, {bridge, UUID}).
 
 link_process(Id, Pid) -> gen_safe:call(Id, fun pid/1, {link_process, Pid}).
-command(Id, Command, Args) -> gen_safe:cast(Id, fun pid/1, {command, Command, Args}).
 
 wait_hangup(Id) -> gen_safe:call(Id, fun pid/1, {wait_hangup}).
 deflect(Id, Target) -> gen_safe:call(Id, fun pid/1, {deflect, Target}).
@@ -122,9 +121,6 @@ handle_cast(park, S=#state{uuid=UUID}) -> fswitch:api("uuid_park ~s", [UUID]), {
 handle_cast(break, S=#state{uuid=UUID}) -> fswitch:api("uuid_break ~s", [UUID]), {noreply, S};
 handle_cast(alive, S=#state{uuid=UUID}) ->
 	{ok, "true"} = fswitch:api("uuid_exists ~s", [UUID]),
-	{noreply, S};
-handle_cast({command, Command, Args}, S=#state{uuid=UUID}) ->
-	fswitch:execute(UUID, Command, Args),
 	{noreply, S};
 handle_cast(hangup, S=#state{uuid=UUID}) ->
 	fswitch:api("uuid_kill ~s", [UUID]),
