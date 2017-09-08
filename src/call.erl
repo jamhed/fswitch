@@ -48,14 +48,16 @@ pid({?MODULE, UUID}) -> pid(UUID);
 pid(UUID) -> gproc:whereis_name({n, l, {?MODULE, UUID}}).
 wait(UUID) -> gproc:await({n, l, {?MODULE, UUID}}, 5000), UUID.
 
-subscribe(uuid, UUID) -> gproc:reg({p, l, {?MODULE, uuid, UUID}}, subscribe);
+subscribe(uuid, UUID) -> gen_safe:subscribe({?MODULE, uuid, UUID});
 subscribe(event, L) when is_list(L) -> [ subscribe(event, Ev) || Ev <- L ];
-subscribe(event, Event) -> gproc:reg({p, l, {?MODULE, event, Event}}, subscribe).
+subscribe(event, Event) -> gen_safe:subscribe({?MODULE, event, Event}).
 subscribe(both, UUID, L) when is_list(L) -> [ subscribe(both, UUID, Ev) || Ev <- L ];
-subscribe(both, UUID, Event) -> gproc:reg({p, l, {?MODULE, both, UUID, Event}}, subscribe).
-unsubscribe(uuid, UUID) -> gproc:unreg({p, l, {?MODULE, uuid, UUID}});
-unsubscribe(event, Event) -> gproc:unreg({p, l, {?MODULE, event, Event}}).
-unsubscribe(both, UUID, Event) -> gproc:unreg({p, l, {?MODULE, both, UUID, Event}}).
+subscribe(both, UUID, Event) -> gen_safe:subscribe({?MODULE, both, UUID, Event}).
+unsubscribe(uuid, UUID) -> gen_safe:unsubscribe({?MODULE, uuid, UUID});
+unsubscribe(event, L) when is_list(L) -> [ unsubscribe(event, Ev) || Ev <- L ];
+unsubscribe(event, Event) -> gen_safe:unsubscribe({?MODULE, event, Event}).
+unsubscribe(both, UUID, L) when is_list(L) -> [ unsubscribe(both, UUID, Ev) || Ev <- L ];
+unsubscribe(both, UUID, Event) -> gen_safe:unsubscribe({?MODULE, both, UUID, Event}).
 
 vars(Id) -> gen_safe:call(Id, fun pid/1, vars).
 variables(Id) -> gen_safe:call(Id, fun pid/1, variables).
