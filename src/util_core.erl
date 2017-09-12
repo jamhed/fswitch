@@ -21,10 +21,10 @@ match_maps(Inner, Outer) ->
 	end.
 
 seconds_from(Ts) ->
-	erlang:convert_time_unit(erlang:monotonic_time() - Ts, native, seconds).
+	erlang:convert_time_unit(erlang:monotonic_time() - Ts, native, second).
 
 ms_from(Ts) ->
-	erlang:convert_time_unit(erlang:monotonic_time() - Ts, native, milliseconds).
+	erlang:convert_time_unit(erlang:monotonic_time() - Ts, native, millisecond).
 
 ns_from(Ts) ->
-	erlang:convert_time_unit(erlang:monotonic_time() - Ts, native, microseconds).
+	erlang:convert_time_unit(erlang:monotonic_time() - Ts, native, microsecond).
