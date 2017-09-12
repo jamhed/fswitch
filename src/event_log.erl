@@ -25,7 +25,7 @@ handle_call({add, Msg}, _, S=#state{ wait = undefined }) ->
 
 handle_call({add, Msg}, _, S=#state{ wait = {Match, Caller} }) ->
 	case util_core:match_maps(Match, Msg) of
-		true -> {reply, {match, Caller, {erlang:timestamp(), Msg}}, (add_msg(Msg, S))#state{ wait = undefined }};
+		true -> {reply, {match, Caller, {erlang:monotonic_time(), Msg}}, (add_msg(Msg, S))#state{ wait = undefined }};
 		false -> {reply, no_match, add_msg(Msg, S)}
 	end;
 
@@ -64,4 +64,4 @@ lookback(Match, [{Ts,Msg} | Log]) ->
 	end.
 
 
-add_msg(Msg, S=#state{log=Log}) -> S#state{ log = [ {erlang:timestamp(), Msg} | Log ] }.
+add_msg(Msg, S=#state{log=Log}) -> S#state{ log = [ {erlang:monotonic_time(), Msg} | Log ] }.
