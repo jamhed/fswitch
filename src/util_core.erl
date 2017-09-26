@@ -1,5 +1,5 @@
 -module(util_core).
--export([match_maps/2, seconds_from/1, ns_from/1, ms_from/1, flatten/1, explode/1]).
+-export([match_maps/2, seconds_from/1, ns_from/1, ms_from/1, flatten/1, explode/1, dump_map/1]).
 
 flatten(M) -> lists:flatten(flatten([], M)).
 
@@ -28,3 +28,8 @@ ms_from(Ts) ->
 
 ns_from(Ts) ->
 	erlang:convert_time_unit(erlang:monotonic_time() - Ts, native, microsecond).
+
+dump_map(M) ->
+	Sorted = lists:sort(fun({A,_},{B,_}) -> B >= A end, maps:to_list(M)),
+	Dump = lists:flatten([ io_lib:format("~s: ~s~n", [K,V]) || {K,V} <- Sorted ]),
+	lager:info("map:~n~s~n", [Dump]).

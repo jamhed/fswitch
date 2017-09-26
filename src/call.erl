@@ -8,7 +8,8 @@
 	subscribe/2, subscribe/3, unsubscribe/2, unsubscribe/3,
 	vars/1, variables/1,
 	hangup/1, answer/1, park/1, break/1,
-	deflect/2, display/3, getvar/2, hold/1, hold/2, setvar/2, setvar/3, setvars/2, send_dtmf/2, broadcast/2, displace/3,
+	deflect/2, display/3, getvar/2, hold/1, hold/2, setvar/2, setvar/3, setvars/2, broadcast/2, displace/3,
+	send_dtmf/2, recv_dtmf/2,
 	execute/3, playback/2, tone_detect/4, detect_tone/2, stop_detect_tone/1,
 	bridge/2, transfer/2, transfer/3, transfer/4, record/3,
 	wait/1, wait_event/2, wait_event/3, wait_event_now/2, wait_event_now/3,
@@ -87,6 +88,7 @@ hold(Id) -> gen_safe:call(Id, fun pid/1, {hold}).
 hold(Id, off) -> gen_safe:call(Id, fun pid/1, {hold, off});
 hold(Id, toggle) -> gen_safe:call(Id, fun pid/1, {hold, toggle}).
 send_dtmf(Id, DTMF) -> gen_safe:call(Id, fun pid/1, {send_dtmf, DTMF}).
+recv_dtmf(Id, DTMF) -> gen_safe:call(Id, fun pid/1, {recv_dtmf, DTMF}).
 setvar(Id, Name) -> gen_safe:call(Id, fun pid/1, {setvar, Name}).
 setvar(Id, Name, Value) -> gen_safe:call(Id, fun pid/1, {setvar, Name, Value}).
 setvars(Id, Vars) -> gen_safe:call(Id, fun pid/1, {setvars, Vars}).
@@ -214,6 +216,7 @@ handle_call({getvar, Name}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("
 handle_call({hold}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_hold ~s", [UUID]), S};
 handle_call({hold, Cmd}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_hold ~s ~s", [Cmd, UUID]), S};
 handle_call({send_dtmf, DTMF}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_send_dtmf ~s ~s", [UUID, DTMF]), S};
+handle_call({recv_dtmf, DTMF}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_recv_dtmf ~s ~s", [UUID, DTMF]), S};
 handle_call({setvar, Name, Value}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_setvar ~s ~s ~s", [UUID, Name, Value]), S};
 handle_call({setvar, Name}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_setvar ~s ~s", [UUID, Name]), S};
 handle_call({transfer, Target}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_transfer ~s ~s", [UUID, Target]), S};
