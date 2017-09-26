@@ -1,6 +1,6 @@
 {application,fswitch,
              [{description,"FreeSWITCH Erlang interface"},
-              {vsn,"1.2.8"},
+              {vsn,"1.2.9"},
               {registered,[]},
               {applications,[kernel,stdlib,lager,gproc]},
               {modules,[call_sup,call,fswitch,freeswitch]},
