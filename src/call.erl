@@ -228,7 +228,7 @@ handle_call({record, Action, Path}, _From, S=#state{uuid=UUID}) -> {reply, fswit
 handle_call({wait_hangup}, From, S=#state{wait_hangup=WaitList}) -> {noreply, S#state{wait_hangup=[From|WaitList]}};
 
 handle_call({setvars, Vars}, _From, S=#state{uuid=UUID}) -> 
-	{reply, fswitch:api("uuid_setvar_multi ~s ~s", [UUID, fswitch:stringify_opts(Vars)]), S};
+	{reply, fswitch:api("uuid_setvar_multi ~s ~s", [UUID, fswitch:stringify_opts(Vars, none, ";")]), S};
 
 handle_call({wait_event, Match}, From, S=#state{ event_log=EvLog }) ->
 	case event_log:wait(EvLog, Match, From) of
