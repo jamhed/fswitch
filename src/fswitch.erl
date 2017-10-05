@@ -5,7 +5,7 @@
 	start_link/1,
 	api/2, api/1, bgapi/2, bgapi/1, execute/3,
 	parse_uuid_dump/1, parse_uuid_dump_string/1,
-	stringify_opts/1, stringify_opts/2
+	stringify_opts/1, stringify_opts/2, stringify_opts/3
 ]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
@@ -111,12 +111,13 @@ to_bin(X) -> X.
 format_opt(K,V) when is_number(V) -> io_lib:format("~s=~p", [K,V]);
 format_opt(K,V) -> io_lib:format("~s=~s", [K,V]).
 
-stringify_opts(Opts) -> stringify_opts(Opts, none).
+stringify_opts(Opts) -> stringify_opts(Opts, none, ",").
+stringify_opts(Opts, Brackets) -> stringify_opts(Opts, Brackets, ",").
 
-stringify_opts([], _) -> "";
-stringify_opts(Opts, Brackets) when is_map(Opts) -> stringify_opts(maps:to_list(Opts), Brackets);
-stringify_opts(Opts, Brackets) when is_list(Opts) ->
-	Str = string:join([ format_opt(K, V) || {K, V} <- Opts ], ","),
+stringify_opts([], _, _) -> "";
+stringify_opts(Opts, Brackets, Joiner) when is_map(Opts) -> stringify_opts(maps:to_list(Opts), Brackets, Joiner);
+stringify_opts(Opts, Brackets, Joiner) when is_list(Opts) ->
+	Str = string:join([ format_opt(K, V) || {K, V} <- Opts ], Joiner),
 	brackets(Brackets, Str).
 
 brackets(curly, Str) -> io_lib:format("{~s}", [Str]);
