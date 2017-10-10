@@ -81,7 +81,7 @@ api(Node, Cmd, Args) ->
 		timeout
 	end.
 
-maybe_log(Node, uuid_kill=Cmd, Args) -> lager:debug("fs api ~s ~s ~s", [Node, Cmd, Args]);
+maybe_log(Node, uuid_kill=Cmd, Args) -> lager:info("fs api ~s ~s ~s", [Node, Cmd, Args]);
 maybe_log(Node, Cmd, Args) -> lager:info("fs api ~s ~s ~s", [Node, Cmd, Args]).
 maybe_log_err(X, uuid_kill=Cmd, Args) -> lager:debug("fs api error ~p ~s ~s", [X, Cmd, Args]);
 maybe_log_err(X, Cmd, Args) -> lager:info("fs api error ~p ~s ~s", [X, Cmd, Args]).

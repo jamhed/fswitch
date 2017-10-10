@@ -1,7 +1,17 @@
 -module(gen_safe).
 -include_lib("stdlib/include/qlc.hrl").
--export([call/3, call/4, cast/3]).
+-export([call/3, call/4, cast/3, call_live/3, call_live/4]).
 -export([subscribe/1, unsubscribe/1, subscriptions/1, subscriptions/2]).
+
+call_live(Id, Msg, Fail) ->
+	try gen_server:call(Id, Msg)
+	catch _:_ -> Fail
+	end.
+
+call_live(Id, PidF, Msg, Fail) ->
+	try call(Id, PidF, Msg)
+	catch _:_ -> Fail
+	end.
 
 call(Id, _PidF, Msg) when is_pid(Id) -> gen_server:call(Id, Msg);
 call(Id, PidF, Msg) ->
