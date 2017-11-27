@@ -109,7 +109,8 @@ to_bin(B) when is_list(B) -> erlang:list_to_binary(B);
 to_bin(X) -> X.
 
 format_opt(K,V) when is_number(V) -> io_lib:format("~s=~p", [K,V]);
-format_opt(K,V) -> io_lib:format("~s=~s", [K,V]).
+format_opt(K,V) when is_boolean(V) -> io_lib:format("~s=~p", [K,V]);
+format_opt(K,V) -> io_lib:format("~s='~s'", [K,V]).
 
 stringify_opts(Opts) -> stringify_opts(Opts, none, ",").
 stringify_opts(Opts, Brackets) -> stringify_opts(Opts, Brackets, ",").
