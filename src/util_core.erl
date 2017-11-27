@@ -31,5 +31,5 @@ ns_from(Ts) ->
 
 dump_map(M) ->
 	Sorted = lists:sort(fun({A,_},{B,_}) -> B >= A end, maps:to_list(M)),
-	Dump = lists:flatten([ io_lib:format("~s: ~s~n", [K,V]) || {K,V} <- Sorted ]),
+	Dump = lists:flatten([ io_lib:format("~s: ~p~n", [K,V]) || {K,V} <- Sorted ]),
 	lager:info("map:~n~s~n", [Dump]).
