@@ -9,7 +9,11 @@ call_live(Id, Msg, Fail) ->
 	end.
 
 call_live(Id, PidF, Msg, Fail) ->
-	try call(Id, PidF, Msg)
+	try
+		case call(Id, PidF, Msg) of
+			{error, no_pid, Id} -> Fail;
+			Re -> Re
+		end
 	catch _:_ -> Fail
 	end.
 
