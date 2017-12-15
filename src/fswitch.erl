@@ -2,8 +2,8 @@
 -behaviour(gen_server).
 
 -export([
-	start_link/1,
-	api/2, api/1, bgapi/2, bgapi/1, execute/3,
+	start_link/2,
+	api/3, api/2, bgapi/3, bgapi/2, execute/4,
 	parse_uuid_dump/1, parse_uuid_dump_string/1,
 	stringify_opts/1, stringify_opts/2, stringify_opts/3
 ]).
@@ -12,23 +12,27 @@
 -define(PING_REPEAT, 1000).
 
 -record(state, {
-	drone,
+	node,
 	jobs
 }).
 
-start_link(Drone) -> gen_server:start_link({local, ?MODULE}, ?MODULE, [Drone], []).
+start_link(Id, Node) -> gen_server:start_link(?MODULE, [Id, Node], []).
 
-api(Cmd, Args) -> gen_server:call(?MODULE, {api, Cmd, Args}).
-api(Cmd) -> gen_server:call(?MODULE, {api, Cmd, []}).
-bgapi(Cmd, Args) -> gen_server:call(?MODULE, {bgapi, Cmd, Args}).
-bgapi(Cmd) -> gen_server:call(?MODULE, {bgapi, Cmd, []}).
-execute(UUID, Command, Args) -> gen_server:call(?MODULE, {execute, UUID, Command, Args}).
+api(Id, Cmd, Args) -> gen_server:call(pid(Id), {api, Cmd, Args}).
+api(Id, Cmd) -> gen_server:call(pid(Id), {api, Cmd, []}).
+bgapi(Id, Cmd, Args) -> gen_server:call(pid(Id), {bgapi, Cmd, Args}).
+bgapi(Id, Cmd) -> gen_server:call(pid(Id), {bgapi, Cmd, []}).
+execute(Id, UUID, Command, Args) -> gen_server:call(pid(Id), {execute, UUID, Command, Args}).
 
-init([FsDrone]) ->
-	Drone = erlang:list_to_atom(FsDrone),
-	lager:notice("start, drone:~p", [Drone]),
+pid(Id) when is_list(Id) -> pid(erlang:list_to_atom(Id));
+pid(Id) -> gproc:whereis_name({n, l, {?MODULE, Id}}).
+
+init([Id, Node]) ->
+	lager:notice("start, id:~p node:~p", [Id, Node]),
+	gproc:reg({n, l, {?MODULE, Id}}),
+	gproc:reg({n, l, {?MODULE, Node}}),
 	self() ! node_check,
-	{ok, #state{jobs=#{}, drone=Drone}}.
+	{ok, #state{jobs=#{}, node=Node}}.
 
 handle_cast(_Msg, S=#state{}) ->
 	lager:error("unhandled cast:~p", [_Msg]),
@@ -41,7 +45,7 @@ handle_info({Re, Job, _}=Msg, S=#state{jobs=J}) when Re =:= bgok; Re =:= bgerror
 	end,
 	{noreply, S#state{jobs=maps:remove(Job, J)}};
 
-handle_info(node_check, S=#state{drone=Node}) ->
+handle_info(node_check, S=#state{node=Node}) ->
 	case net_adm:ping(Node) of
 		pong ->
 			lager:notice("freeswitch node up:~p", [Node]),
@@ -61,14 +65,14 @@ handle_info(_Info, S=#state{}) ->
 	lager:error("unhandled info:~p", [_Info]),
 	{noreply, S}.
 
-handle_call({api, Cmd, Args}, _From, S=#state{drone=Fs}) ->
+handle_call({api, Cmd, Args}, _From, S=#state{node=Fs}) ->
 	{reply, freeswitch:fapi(Fs, Cmd, Args), S};
 
-handle_call({bgapi, Cmd, Args}, {Pid, _Ref}, S=#state{drone=Fs, jobs=J}) ->
+handle_call({bgapi, Cmd, Args}, {Pid, _Ref}, S=#state{node=Fs, jobs=J}) ->
 	{ok, Job} = freeswitch:fbgapi(Fs, Cmd, Args),
 	{reply, {ok, Job}, S#state{jobs=J#{ Job => Pid }}};
 
-handle_call({execute, UUID, Cmd, Args}, _From, S=#state{drone=Fs}) ->
+handle_call({execute, UUID, Cmd, Args}, _From, S=#state{node=Fs}) ->
 	{reply, freeswitch:sendmsg(Fs, UUID, [
 		{"call-command", "execute"},
 		{"execute-app-name", Cmd},
