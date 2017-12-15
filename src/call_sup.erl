@@ -5,7 +5,7 @@
 % accept and distribute to proper processes fs calls, either inbound or outbound
 
 -export([
-	start_link/0, start_link/1, create_uuid/0, originate/3, originate/2, originate/1, wait_call/0,
+	start_link/0, start_link/1, uuid/0, originate/3, originate/2, originate/1, wait_call/0,
 	set/3, vars/1, variables/1, get/1, on_hangup/1
 ]).
 
@@ -81,7 +81,7 @@ handle_cast(_Msg, S=#state{}) ->
 	{noreply, S}.
 
 handle_call({originate, URL, Exten, Opts}, _From, S=#state{template=T, jobs=J}) ->
-	UUID = create_uuid(),
+	UUID = uuid(),
 	Opts1 = apply_opts(Opts, [
 		{fun with_uuid/2, [UUID]},
 		{fun with_timeout/2, [proplists:get_value(originate_timeout, Opts, 5)]}
@@ -127,6 +127,4 @@ apply_opts(Opts, [{F, Args}|Fs]) -> apply_opts(erlang:apply(F, [Opts|Args]), Fs)
 
 template(T, N) -> io_lib:format(T, [N]).
 
-create_uuid() ->
-	{ok, UUID} = fswitch:api(create_uuid),
-	UUID.
+uuid() -> erlang:list_to_binary(uuid:to_string(uuid:uuid5(uuid:uuid4(), "call_sup"))).
