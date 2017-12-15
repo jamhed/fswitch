@@ -19,9 +19,9 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
-	fs,
+	fs, % fs id (erlang node)
 	call_state,
-	uuid,
+	uuid, % we silently assume these to be unique event among several fs instances
 	wait_hangup = [],
 	event_log
 }).

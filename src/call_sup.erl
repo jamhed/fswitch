@@ -5,7 +5,7 @@
 % accept and distribute to proper processes fs calls, either inbound or outbound
 
 -export([
-	start_link/1, start_link/0, uuid/0, originate/3, originate/2, originate/1, wait_call/0,
+	start_link/1, start_link/0, uuid/0, originate/4, originate/3, originate/2, wait_call/0,
 	set/3, vars/1, variables/1, get/1, on_hangup/1
 ]).
 
@@ -27,9 +27,9 @@ vars(UUID) -> gen_server:call(?MODULE, {vars, UUID}).
 variables(UUID) -> gen_server:call(?MODULE, {variables, UUID}).
 on_hangup(UUID) -> gen_server:call(?MODULE, {on_hangup, UUID}).
 
-originate(Url, Exten, Opts) -> gen_server:call(?MODULE, {originate, Url, Exten, Opts}).
-originate(Url, Opts) -> originate(Url, self_exten(), Opts).
-originate(Url) -> originate(Url, []).
+originate(FsId, Url, Exten, Opts) -> gen_server:call(?MODULE, {originate, FsId, Url, Exten, Opts}).
+originate(FsId, Url, Opts) -> originate(FsId, Url, self_exten(), Opts).
+originate(FsId, Url) -> originate(FsId, Url, []).
 
 self_exten() -> io_lib:format("&erlang('~s:! ~s')", [?MODULE, node()]).
 
@@ -51,12 +51,14 @@ handle_info({freeswitch_sendmsg, Str}, #state{}=S) ->
 	{ok, _Pid} = call:start_link(UUID),
 	{noreply, S};
 
+% main entry point, fs calls this to refer call to erlang process
 handle_info({get_pid, Str, Ref, From}, #state{}=S) ->
+	FsId = node(From),
 	UUID = erlang:list_to_binary(Str),
-	lager:debug("~s control request", [UUID]),
+	lager:notice("~s ~s control request ref:~p from:~p from:~p", [FsId, UUID]),
 	CallPid =
 		case call:pid(UUID) of
-			undefined -> {ok, Pid} = call:start_link(UUID), Pid;
+			undefined -> {ok, Pid} = call:start_link(FsId, UUID), Pid;
 			Pid -> Pid
 		end,
 	From ! {Ref, CallPid},
@@ -80,13 +82,13 @@ handle_cast(_Msg, S=#state{}) ->
 	lager:error("unhandled cast:~p", [_Msg]),
 	{noreply, S}.
 
-handle_call({originate, URL, Exten, Opts}, _From, S=#state{template=T, jobs=J}) ->
+handle_call({originate, FsId, URL, Exten, Opts}, _From, S=#state{template=T, jobs=J}) ->
 	UUID = uuid(),
 	Opts1 = apply_opts(Opts, [
 		{fun with_uuid/2, [UUID]},
 		{fun with_timeout/2, [proplists:get_value(originate_timeout, Opts, 5)]}
 	]),
-	{ok, Job} = fswitch:bgapi("originate ~s~s ~s", [fswitch:stringify_opts(Opts1, curly), template(T, URL), Exten]),
+	{ok, Job} = fswitch:bgapi(FsId, "originate ~s~s ~s", [fswitch:stringify_opts(Opts1, curly), template(T, URL), Exten]),
 	{reply, UUID, S#state{ jobs = J#{ Job => UUID } }};
 
 handle_call({set, UUID, Vars, Variables}, _From, S=#state{call_data=Pid}) ->

@@ -1,8 +1,9 @@
 -module(fswitch).
 -behaviour(gen_server).
+-include_lib("stdlib/include/qlc.hrl").
 
 -export([
-	start_link/2,
+	start_link/1, stop/1, alive/0, pid/1,
 	api/3, api/2, bgapi/3, bgapi/2, execute/4,
 	parse_uuid_dump/1, parse_uuid_dump_string/1,
 	stringify_opts/1, stringify_opts/2, stringify_opts/3
@@ -16,7 +17,8 @@
 	jobs
 }).
 
-start_link(Id, Node) -> gen_server:start_link(?MODULE, [Id, Node], []).
+start_link(Node) -> gen_server:start_link(?MODULE, [Node], []).
+stop(Id) -> gen_server:cast(Id, {stop}).
 
 api(Id, Cmd, Args) -> gen_server:call(pid(Id), {api, Cmd, Args}).
 api(Id, Cmd) -> gen_server:call(pid(Id), {api, Cmd, []}).
@@ -24,15 +26,21 @@ bgapi(Id, Cmd, Args) -> gen_server:call(pid(Id), {bgapi, Cmd, Args}).
 bgapi(Id, Cmd) -> gen_server:call(pid(Id), {bgapi, Cmd, []}).
 execute(Id, UUID, Command, Args) -> gen_server:call(pid(Id), {execute, UUID, Command, Args}).
 
+pid(Pid) when is_pid(Pid) -> Pid;
 pid(Id) when is_list(Id) -> pid(erlang:list_to_atom(Id));
 pid(Id) -> gproc:whereis_name({n, l, {?MODULE, Id}}).
 
-init([Id, Node]) ->
-	lager:notice("start, id:~p node:~p", [Id, Node]),
-	gproc:reg({n, l, {?MODULE, Id}}),
+alive() ->
+	Q = qlc:q([ Id || {{n,l,{?MODULE, Id}}, _Pid, _} <- gproc:table({l, n}) ]),
+	qlc:e(Q).
+
+init([Node]) ->
+	lager:notice("start, node:~p", [Node]),
 	gproc:reg({n, l, {?MODULE, Node}}),
 	self() ! node_check,
 	{ok, #state{jobs=#{}, node=Node}}.
+
+handle_cast({stop}, S=#state{}) -> {stop, normal, S};
 
 handle_cast(_Msg, S=#state{}) ->
 	lager:error("unhandled cast:~p", [_Msg]),
