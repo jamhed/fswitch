@@ -4,7 +4,7 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([
-	start_link/1, pid/1, tuple/1, alive/1, link_process/2, wait_hangup/1,
+	start_link/2, pid/1, tuple/1, alive/1, link_process/2, wait_hangup/1,
 	subscribe/2, subscribe/3, unsubscribe/2, unsubscribe/3,
 	vars/1, variables/1,
 	hangup/1, answer/1, park/1, break/1,
@@ -19,6 +19,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
+	fs,
 	call_state,
 	uuid,
 	wait_hangup = [],
@@ -40,8 +41,8 @@ match_for(Key) ->
 	Q = qlc:q([ {UUID, maps:get(Key, M)} || {{n,l,{?MODULE,UUID}}, _Pid, M=#{}} <- gproc:table({l, n}), maps:is_key(Key, M) ]),
 	qlc:e(Q).
 
-start_link(UUID) ->
-	gen_server:start_link(?MODULE, [UUID], []).
+start_link(Id, UUID) ->
+	gen_server:start_link(?MODULE, [Id, UUID], []).
 
 % gproc api
 tuple(UUID) -> {?MODULE, UUID}.
@@ -113,50 +114,50 @@ wait_event_now(Id, Match, Timeout) ->
 
 sync_state(Pid) when is_pid(Pid) -> Pid ! sync_state.
 
-init([UUID]) ->
-	lager:info("~s start", [UUID]),
+init([Id, UUID]) ->
+	lager:info("~s start, fs:~p", [UUID, Id]),
 	gproc:reg({n, l, {?MODULE, UUID}}),
 	sync_state(self()),
 	{ok, EvLog} = event_log:start_link(),
-	{ok, #state{uuid = UUID, event_log = EvLog}}.
+	{ok, #state{fs=Id, uuid = UUID, event_log = EvLog}}.
 
-handle_cast(answer, S=#state{uuid=UUID}) -> fswitch:api("uuid_answer ~s", [UUID]), {noreply, S};
-handle_cast(park, S=#state{uuid=UUID}) -> fswitch:api("uuid_park ~s", [UUID]), {noreply, S};
-handle_cast(break, S=#state{uuid=UUID}) -> fswitch:api("uuid_break ~s", [UUID]), {noreply, S};
-handle_cast(alive, S=#state{uuid=UUID}) ->
-	{ok, "true"} = fswitch:api("uuid_exists ~s", [UUID]),
+handle_cast(answer, S=#state{fs=Id, uuid=UUID}) -> fswitch:api(Id, "uuid_answer ~s", [UUID]), {noreply, S};
+handle_cast(park, S=#state{fs=Id, uuid=UUID}) -> fswitch:api(Id, "uuid_park ~s", [UUID]), {noreply, S};
+handle_cast(break, S=#state{fs=Id, uuid=UUID}) -> fswitch:api(Id, "uuid_break ~s", [UUID]), {noreply, S};
+handle_cast(alive, S=#state{fs=Id, uuid=UUID}) ->
+	{ok, "true"} = fswitch:api(Id, "uuid_exists ~s", [UUID]),
 	{noreply, S};
-handle_cast(hangup, S=#state{uuid=UUID}) ->
-	fswitch:api("uuid_kill ~s", [UUID]),
+handle_cast(hangup, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:api(Id, "uuid_kill ~s", [UUID]),
 	{noreply, S};
 handle_cast(stop, S=#state{}) ->
 	{stop, normal, S};
 
 % doesn't work?
-handle_cast({tone_detect, Name, Tone, Timeout}, S=#state{uuid=UUID}) ->
-	fswitch:api("tone_detect ~s ~s ~s r +~p stop_tone_detect '' 1", [UUID, Name, Tone, Timeout]),
+handle_cast({tone_detect, Name, Tone, Timeout}, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:api(Id, "tone_detect ~s ~s ~s r +~p stop_tone_detect '' 1", [UUID, Name, Tone, Timeout]),
 	{noreply, S};
-handle_cast({detect_tone, ToneName}, S=#state{uuid=UUID}) ->
-	fswitch:api("spandsp_start_tone_detect ~s ~s", [UUID, ToneName]),
+handle_cast({detect_tone, ToneName}, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:api(Id, "spandsp_start_tone_detect ~s ~s", [UUID, ToneName]),
 	{noreply, S};
-handle_cast(stop_detect_tone, S=#state{uuid=UUID}) ->
-	fswitch:api("spandsp_stop_tone_detect ~s", [UUID]),
+handle_cast(stop_detect_tone, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:api(Id, "spandsp_stop_tone_detect ~s", [UUID]),
 	{noreply, S};
 
-handle_cast({broadcast, Path}, S=#state{uuid=UUID}) ->
-	fswitch:api("uuid_broadcast ~s ~s", [UUID, Path]),
+handle_cast({broadcast, Path}, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:api(Id, "uuid_broadcast ~s ~s", [UUID, Path]),
 	{noreply, S};
-handle_cast({displace, Cmd, Path}, S=#state{uuid=UUID}) ->
-	fswitch:api("uuid_displace ~s ~s ~s", [UUID, Cmd, Path]),
+handle_cast({displace, Cmd, Path}, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:api(Id, "uuid_displace ~s ~s ~s", [UUID, Cmd, Path]),
 	{noreply, S};
-handle_cast({execute, Cmd, Path}, S=#state{uuid=UUID}) ->
-	fswitch:execute(UUID, Cmd, Path),
+handle_cast({execute, Cmd, Path}, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:execute(Id, UUID, Cmd, Path),
 	{noreply, S};
-handle_cast({playback, Tone}, S=#state{uuid=UUID}) ->
-	fswitch:execute(UUID, "playback", Tone),
+handle_cast({playback, Tone}, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:execute(Id, UUID, "playback", Tone),
 	{noreply, S};
-handle_cast({bridge, Peer}, S=#state{uuid=UUID}) ->
-	fswitch:api("uuid_bridge ~s ~s", [UUID, Peer]),
+handle_cast({bridge, Peer}, S=#state{fs=Id, uuid=UUID}) ->
+	fswitch:api(Id, "uuid_bridge ~s ~s", [UUID, Peer]),
 	{noreply, S};
 
 handle_cast(_Msg, S=#state{uuid=_UUID}) ->
@@ -192,8 +193,8 @@ handle_info({call_hangup, UUID}, S=#state{uuid=UUID, event_log=EvLog}) ->
 	end,
 	{stop, normal, S};
 
-handle_info(sync_state, S=#state{uuid=UUID}) ->
-	maybe_sync_state(fswitch:api("uuid_dump ~s", [UUID]), S);
+handle_info(sync_state, S=#state{fs=Id, uuid=UUID}) ->
+	maybe_sync_state(fswitch:api(Id, "uuid_dump ~s", [UUID]), S);
 
 handle_info({'DOWN', _Ref, process, _Pid, _Reason}, S=#state{uuid=_UUID}) ->
 	lager:info("~s owner is dead, pid:~p reason:~p", [_UUID, _Pid, _Reason]),
@@ -210,25 +211,25 @@ handle_call({link_process, Pid}, _From, S=#state{}) ->
 handle_call(vars, _From, S=#state{uuid=UUID}) -> {reply, call_sup:vars(UUID), S};
 handle_call(variables, _From, S=#state{uuid=UUID}) -> {reply, call_sup:variables(UUID), S};
 
-handle_call({deflect, Target}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_deflect ~s ~s", [UUID, Target]), S};
-handle_call({display, Name, Number}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_display ~s ~s|~s", [UUID, Name, Number]), S};
-handle_call({getvar, Name}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_getvar ~s ~s", [UUID, Name]), S};
-handle_call({hold}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_hold ~s", [UUID]), S};
-handle_call({hold, Cmd}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_hold ~s ~s", [Cmd, UUID]), S};
-handle_call({send_dtmf, DTMF}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_send_dtmf ~s ~s", [UUID, DTMF]), S};
-handle_call({recv_dtmf, DTMF}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_recv_dtmf ~s ~s", [UUID, DTMF]), S};
-handle_call({setvar, Name, Value}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_setvar ~s ~s ~s", [UUID, Name, Value]), S};
-handle_call({setvar, Name}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_setvar ~s ~s", [UUID, Name]), S};
-handle_call({transfer, Target}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_transfer ~s ~s", [UUID, Target]), S};
-handle_call({transfer, Target, Dialplan}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_transfer ~s ~s ~s", [UUID, Target, Dialplan]), S};
-handle_call({transfer, Target, Dialplan, Context}, _From, S=#state{uuid=UUID}) ->
-	{reply, fswitch:api("uuid_transfer ~s ~s ~s ~s", [UUID, Target, Dialplan, Context]), S};
-handle_call({record, Action, Path}, _From, S=#state{uuid=UUID}) -> {reply, fswitch:api("uuid_record ~s ~s ~s", [UUID, Action, Path]), S};
+handle_call({deflect, Target}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_deflect ~s ~s", [UUID, Target]), S};
+handle_call({display, Name, Number}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_display ~s ~s|~s", [UUID, Name, Number]), S};
+handle_call({getvar, Name}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_getvar ~s ~s", [UUID, Name]), S};
+handle_call({hold}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_hold ~s", [UUID]), S};
+handle_call({hold, Cmd}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_hold ~s ~s", [Cmd, UUID]), S};
+handle_call({send_dtmf, DTMF}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_send_dtmf ~s ~s", [UUID, DTMF]), S};
+handle_call({recv_dtmf, DTMF}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_recv_dtmf ~s ~s", [UUID, DTMF]), S};
+handle_call({setvar, Name, Value}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_setvar ~s ~s ~s", [UUID, Name, Value]), S};
+handle_call({setvar, Name}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_setvar ~s ~s", [UUID, Name]), S};
+handle_call({transfer, Target}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_transfer ~s ~s", [UUID, Target]), S};
+handle_call({transfer, Target, Dialplan}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_transfer ~s ~s ~s", [UUID, Target, Dialplan]), S};
+handle_call({transfer, Target, Dialplan, Context}, _From, S=#state{fs=Id, uuid=UUID}) ->
+	{reply, fswitch:api(Id, "uuid_transfer ~s ~s ~s ~s", [UUID, Target, Dialplan, Context]), S};
+handle_call({record, Action, Path}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_record ~s ~s ~s", [UUID, Action, Path]), S};
 % just wait process to die
 handle_call({wait_hangup}, From, S=#state{wait_hangup=WaitList}) -> {noreply, S#state{wait_hangup=[From|WaitList]}};
 
-handle_call({setvars, Vars}, _From, S=#state{uuid=UUID}) -> 
-	{reply, fswitch:api("uuid_setvar_multi ~s ~s", [UUID, fswitch:stringify_opts(Vars, none, ";")]), S};
+handle_call({setvars, Vars}, _From, S=#state{fs=Id, uuid=UUID}) -> 
+	{reply, fswitch:api(Id, "uuid_setvar_multi ~s ~s", [UUID, fswitch:stringify_opts(Vars, none, ";")]), S};
 
 handle_call({wait_event, Match}, From, S=#state{ event_log=EvLog }) ->
 	case event_log:wait(EvLog, Match, From) of
@@ -244,9 +245,9 @@ handle_call(_Request, _From, S=#state{uuid=_UUID}) ->
 	lager:error("~s unhandled call:~p", [_Request]),
 	{reply, ok, S}.
 
-terminate(_Reason, _S=#state{uuid=UUID, wait_hangup=WaitList}) ->
+terminate(_Reason, _S=#state{fs=Id, uuid=UUID, wait_hangup=WaitList}) ->
 	lager:info("~s terminate, reason:~p", [UUID, _Reason]),
-	fswitch:api("uuid_kill ~s", [UUID]),
+	fswitch:api(Id, "uuid_kill ~s", [UUID]),
 	call_sup:on_hangup(UUID),
 	[ gen_server:reply(Caller, ok) || Caller <- WaitList ],
 	ok.

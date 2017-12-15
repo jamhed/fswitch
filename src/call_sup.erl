@@ -5,7 +5,7 @@
 % accept and distribute to proper processes fs calls, either inbound or outbound
 
 -export([
-	start_link/0, start_link/1, uuid/0, originate/3, originate/2, originate/1, wait_call/0,
+	start_link/1, start_link/0, uuid/0, originate/3, originate/2, originate/1, wait_call/0,
 	set/3, vars/1, variables/1, get/1, on_hangup/1
 ]).
 
