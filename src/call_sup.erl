@@ -2,7 +2,7 @@
 -include_lib("fswitch/include/fswitch.hrl").
 -behaviour(gen_server).
 
-% accept and distribute to proper processes fs calls, either inbound or outbound
+% accept and distribute to erlang processes fs calls, either inbound or outbound
 
 -export([
 	start_link/1, start_link/0, uuid/0, originate/4, originate/3, originate/2, wait_call/0,
@@ -45,17 +45,15 @@ init([Template]) ->
 	{ok, Pid} = call_data:start_link(),
 	{ok, #state{jobs=#{}, template=Template, call_data=Pid}}.
 
-handle_info({freeswitch_sendmsg, Str}, #state{}=S) ->
-	UUID = erlang:list_to_binary(Str),
+handle_info({freeswitch_sendmsg, UUID}, #state{}=S) ->
 	lager:info("~s incoming message", [UUID]),
 	{ok, _Pid} = call:start_link(UUID),
 	{noreply, S};
 
 % main entry point, fs calls this to refer call to erlang process
-handle_info({get_pid, Str, Ref, From}, #state{}=S) ->
+handle_info({get_pid, UUID, Ref, From}, #state{}=S) ->
 	FsId = node(From),
-	UUID = erlang:list_to_binary(Str),
-	lager:notice("~s ~s control request ref:~p from:~p from:~p", [FsId, UUID]),
+	lager:info("~s ~s control request", [FsId, UUID]),
 	CallPid =
 		case call:pid(UUID) of
 			undefined -> {ok, Pid} = call:start_link(FsId, UUID), Pid;

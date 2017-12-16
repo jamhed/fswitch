@@ -164,24 +164,24 @@ handle_cast(_Msg, S=#state{uuid=_UUID}) ->
 	lager:error("~s unhandled cast:~p", [_UUID, _Msg]),
 	{noreply, S}.
 
-% these messages come directly from fs, convert uuid to binary
+% these messages come directly from fs
 
 handle_info({call_event, {event,[UUID|Pairs]}}, S=#state{}) when is_list(UUID) ->
-	handle_info({call_event, {event,[erlang:list_to_binary(UUID)|Pairs]}}, S);
+	handle_info({call_event, {event,[UUID|Pairs]}}, S);
 
 handle_info({call_event, {event,[UUID|Pairs]}}, S=#state{uuid=UUID}) ->
 	{Vars, Variables} = fswitch:parse_uuid_dump(Pairs),
 	handle_event(Vars, Variables, S);
 
 handle_info({call, {event,[UUID|Pairs]}}, S=#state{}) when is_list(UUID) ->
-	handle_info({call, {event,[erlang:list_to_binary(UUID)|Pairs]}}, S);
+	handle_info({call, {event,[UUID|Pairs]}}, S);
 
 handle_info({call, {event,[UUID|Pairs]}}, S=#state{uuid=UUID}) ->
 	{Vars, Variables} = fswitch:parse_uuid_dump(Pairs),
 	handle_event(Vars, Variables, S);
 
 handle_info({call_hangup, UUID}, S=#state{}) when is_list(UUID) ->
-	handle_info({call_hangup, erlang:list_to_binary(UUID)}, S);
+	handle_info({call_hangup, UUID}, S);
 
 handle_info({call_hangup, UUID}, S=#state{uuid=UUID, event_log=EvLog}) ->
 	case event_log:search(EvLog, event_match(<<"CHANNEL_HANGUP">>)) of

@@ -71,8 +71,7 @@ api(Node, Cmd, Args) ->
 	maybe_log(Node, Cmd, Args),
 	{api, Node} ! {api, Cmd, Args},
 	receive
-		{ok, X} -> 
-			{ok, erlang:list_to_binary(X)};
+		{ok, X} -> {ok, X};
 		{error, X} ->
 			maybe_log_err(X, Cmd, Args),
 			{error, X}
@@ -120,14 +119,14 @@ bgapi_handler(ParentPid, Node, Cmd, Args) ->
 			ParentPid ! {api, {error, Reason}};
 		{ok, JobID} ->
 			lager:debug("fs bgapi success, job id:~p", [JobID]),
-			ParentPid ! {api, {ok, l2b(JobID)}},
+			ParentPid ! {api, {ok, JobID}},
 			receive % wait for the job's reply
 				{bgok, JobID, Reply} ->
 					lager:debug("fs bgapi job success, job id:~p reply:~p", [JobID, Reply]),
-					ParentPid ! {bgok, l2b(JobID), l2b(Reply)};
+					ParentPid ! {bgok, JobID, Reply};
 				{bgerror, JobID, Reply} ->
 					lager:info("fs bgapi job error, job id:~p reply:~p", [JobID, Reply]),
-					ParentPid ! {bgerror, l2b(JobID), l2b(Reply)}
+					ParentPid ! {bgerror, JobID, Reply}
 			end
 		after
 			?TIMEOUT ->
@@ -328,5 +327,3 @@ start_event_handler(Node, Module, Function, State) ->
 
 start_fetch_handler(Node, Section, Module, Function, State) ->
 	start_handler(Node, {bind, Section}, Module, Function, State).
-
-l2b(L) when is_list(L) -> erlang:list_to_binary(L).
