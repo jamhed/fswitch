@@ -127,4 +127,4 @@ apply_opts(Opts, [{F, Args}|Fs]) -> apply_opts(erlang:apply(F, [Opts|Args]), Fs)
 
 template(T, N) -> io_lib:format(T, [N]).
 
-uuid() -> erlang:list_to_binary(uuid:to_string(uuid:uuid5(uuid:uuid4(), "call_sup"))).
+uuid() -> erlang:list_to_binary(uuid:uuid_to_string(uuid:get_v5(<<"call_sup">>, uuid:get_v4()))).
