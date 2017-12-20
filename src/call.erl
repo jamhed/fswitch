@@ -11,15 +11,15 @@
 	deflect/2, display/3, getvar/2, hold/1, hold/2, setvar/2, setvar/3, setvars/2, broadcast/2, displace/3,
 	send_dtmf/2, recv_dtmf/2,
 	execute/3, playback/2, tone_detect/4, detect_tone/2, stop_detect_tone/1,
-	bridge/2, transfer/2, transfer/3, transfer/4, record/3,
+	bridge/2, transfer/3, record/3,
 	wait/1, wait_event/2, wait_event/3, wait_event_now/2, wait_event_now/3,
-	active/0, hupall/0, stop/0, answer/0, match_for/1, notify_uuid/2, stop/1
+	active/0, hupall/0, stop/0, answer/0, match_for/1, notify_uuid/3, stop/1
 ]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
-	fs, % fs id (erlang node)
+	fs, % fs id (erlang node id atom, e.g. freeswitch@host)
 	call_state,
 	uuid, % we silently assume these to be unique event among several fs instances
 	wait_hangup = [],
@@ -93,9 +93,7 @@ recv_dtmf(Id, DTMF) -> gen_safe:call(Id, fun pid/1, {recv_dtmf, DTMF}).
 setvar(Id, Name) -> gen_safe:call(Id, fun pid/1, {setvar, Name}).
 setvar(Id, Name, Value) -> gen_safe:call(Id, fun pid/1, {setvar, Name, Value}).
 setvars(Id, Vars) -> gen_safe:call(Id, fun pid/1, {setvars, Vars}).
-transfer(Id, Target) -> gen_safe:call(Id, fun pid/1, {transfer, Target}).
-transfer(Id, Target, Dialplan) -> gen_safe:call(Id, fun pid/1, {transfer, Target, Dialplan}).
-transfer(Id, Target, Dialplan, Context) -> gen_safe:call(Id, fun pid/1, {transfer, Target, Dialplan, Context}).
+transfer(Id, Template, Args) -> gen_safe:call(Id, fun pid/1, {transfer, Template, Args}).
 record(Id, Action=start, Path) -> gen_safe:call(Id, fun pid/1, {record, Action, Path});
 record(Id, Action=stop, Path) -> gen_safe:call(Id, fun pid/1, {record, Action, Path});
 record(Id, Action=mask, Path) -> gen_safe:call(Id, fun pid/1, {record, Action, Path});
@@ -220,10 +218,8 @@ handle_call({send_dtmf, DTMF}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fsw
 handle_call({recv_dtmf, DTMF}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_recv_dtmf ~s ~s", [UUID, DTMF]), S};
 handle_call({setvar, Name, Value}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_setvar ~s ~s ~s", [UUID, Name, Value]), S};
 handle_call({setvar, Name}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_setvar ~s ~s", [UUID, Name]), S};
-handle_call({transfer, Target}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_transfer ~s ~s", [UUID, Target]), S};
-handle_call({transfer, Target, Dialplan}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_transfer ~s ~s ~s", [UUID, Target, Dialplan]), S};
-handle_call({transfer, Target, Dialplan, Context}, _From, S=#state{fs=Id, uuid=UUID}) ->
-	{reply, fswitch:api(Id, "uuid_transfer ~s ~s ~s ~s", [UUID, Target, Dialplan, Context]), S};
+handle_call({transfer, Template, Args}, _From, S=#state{fs=Id, uuid=UUID}) ->
+	{reply, fswitch:api(Id, "uuid_transfer ~s ~s", [UUID, fmt(Template, Args)]), S};
 handle_call({record, Action, Path}, _From, S=#state{fs=Id, uuid=UUID}) -> {reply, fswitch:api(Id, "uuid_record ~s ~s ~s", [UUID, Action, Path]), S};
 % just wait process to die
 handle_call({wait_hangup}, From, S=#state{wait_hangup=WaitList}) -> {noreply, S#state{wait_hangup=[From|WaitList]}};
@@ -254,10 +250,10 @@ terminate(_Reason, _S=#state{fs=Id, uuid=UUID, wait_hangup=WaitList}) ->
 
 code_change(_OldVsn, S=#state{}, _Extra) -> {ok, S}.
 
-handle_event(Vars = #{ <<"Event-Name">> := Ev }, Variables, S=#state{uuid=UUID, event_log=EvLog}) ->
+handle_event(Vars = #{ <<"Event-Name">> := Ev }, Variables, S=#state{fs=FsId, uuid=UUID, event_log=EvLog}) ->
 	maybe_debug(Ev, UUID, Vars),
-	notify_uuid(UUID, Ev),
-	notify_event(UUID, Ev, Vars),
+	notify_uuid(FsId, UUID, Ev),
+	notify_event(FsId, UUID, Ev, Vars),
 	case event_log:add(EvLog, Vars) of
 		{match, Caller, {Ts, Msg}} -> gen_server:reply(Caller, {match, Ts, Msg});
 		_ -> skip
@@ -265,12 +261,12 @@ handle_event(Vars = #{ <<"Event-Name">> := Ev }, Variables, S=#state{uuid=UUID, 
 	call_sup:set(UUID, Vars, Variables),
 	{noreply, set_call_state(Vars, S)}.
 
-notify_uuid(UUID, Ev) ->
-	gproc:send({p, l, {?MODULE, uuid, UUID}}, #call_event{uuid=UUID, event=Ev}).
+notify_uuid(FsId, UUID, Ev) ->
+	gproc:send({p, l, {?MODULE, uuid, UUID}}, #call_event{fs=FsId, uuid=UUID, event=Ev}).
 
-notify_event(UUID, Ev, Vars) ->
-	gproc:send({p, l, {?MODULE, both, UUID, Ev}}, #call_event{uuid=UUID, event=Ev, vars=Vars}),
-	gproc:send({p, l, {?MODULE, event, Ev}}, #call_event{uuid=UUID, event=Ev, vars=Vars}).
+notify_event(FsId, UUID, Ev, Vars) ->
+	gproc:send({p, l, {?MODULE, both, UUID, Ev}}, #call_event{fs=FsId, uuid=UUID, event=Ev, vars=Vars}),
+	gproc:send({p, l, {?MODULE, event, Ev}}, #call_event{fs=FsId, uuid=UUID, event=Ev, vars=Vars}).
 
 set_call_state(#{ <<"Channel-Call-State">> := State }, S) -> S#state{ call_state = State };
 set_call_state(_, S) -> S.
@@ -287,3 +283,5 @@ maybe_sync_state({ok, Dump}, S) ->
 maybe_sync_state(_Err, S) ->
 	lager:info("fs channel is dead already"),
 	{stop, normal, S}.
+
+fmt(F, A) -> lists:flatten(io_lib:format(F, A)).

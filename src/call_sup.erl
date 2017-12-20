@@ -6,7 +6,7 @@
 
 -export([
 	start_link/1, start_link/0, uuid/0, originate/4, originate/3, originate/2, wait_call/0,
-	set/3, vars/1, variables/1, get/1, on_hangup/1
+	set/3, vars/1, variables/1, get/1, on_hangup/1, kill/2, transfer/4
 ]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -30,6 +30,9 @@ on_hangup(UUID) -> gen_server:call(?MODULE, {on_hangup, UUID}).
 originate(FsId, Url, Exten, Opts) -> gen_server:call(?MODULE, {originate, FsId, Url, Exten, Opts}).
 originate(FsId, Url, Opts) -> originate(FsId, Url, self_exten(), Opts).
 originate(FsId, Url) -> originate(FsId, Url, []).
+
+kill(FsId, UUID) -> fswitch:api(FsId, "uuid_kill ~s", [UUID]).
+transfer(FsId, UUID, Template, Args) -> fswitch:api(FsId, "uuid_transfer ~s ~s", [UUID, fmt(Template, Args)]).
 
 self_exten() -> io_lib:format("&erlang('~s:! ~s')", [?MODULE, node()]).
 
@@ -65,7 +68,7 @@ handle_info({get_pid, UUID, Ref, From}, #state{}=S) ->
 handle_info({bgerror, Job, _}, S=#state{jobs=J}) ->
 	case maps:get(Job, J) of
 		{badkey, _} -> skip;
-		UUID -> call:notify_uuid(UUID, <<"BGERROR">>)
+		{FsId, UUID} -> call:notify_uuid(FsId, UUID, <<"BGERROR">>)
 	end,
 	{noreply, S#state{jobs=maps:remove(Job, J)}};
 
@@ -87,7 +90,7 @@ handle_call({originate, FsId, URL, Exten, Opts}, _From, S=#state{template=T, job
 		{fun with_timeout/2, [proplists:get_value(originate_timeout, Opts, 5)]}
 	]),
 	{ok, Job} = fswitch:bgapi(FsId, "originate ~s~s ~s", [fswitch:stringify_opts(Opts1, curly), template(T, URL), Exten]),
-	{reply, UUID, S#state{ jobs = J#{ Job => UUID } }};
+	{reply, UUID, S#state{ jobs = J#{ Job => {FsId, UUID} } }};
 
 handle_call({set, UUID, Vars, Variables}, _From, S=#state{call_data=Pid}) ->
 	Re = call_data:set(Pid, UUID, Vars, Variables),
@@ -128,3 +131,5 @@ apply_opts(Opts, [{F, Args}|Fs]) -> apply_opts(erlang:apply(F, [Opts|Args]), Fs)
 template(T, N) -> io_lib:format(T, [N]).
 
 uuid() -> erlang:list_to_binary(uuid:uuid_to_string(uuid:get_v5(<<"call_sup">>, uuid:get_v4()))).
+
+fmt(F, A) -> lists:flatten(io_lib:format(F, A)).
