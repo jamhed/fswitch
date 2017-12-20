@@ -26,15 +26,15 @@
 	event_log
 }).
 
+-record(call_subscribe, { type, uuid, event }).
+
 active() ->
 	Q = qlc:q([ UUID || {{n,l,{?MODULE,UUID}}, _Pid, _} <- gproc:table({l, n}) ]),
 	qlc:e(Q).
 
 remove_subscribers(UUID) ->
-	Q1 = qlc:q([ {Pid, K} || {{p, l, {?MODULE, K, I}}, Pid, _} <- gproc:table({l, p}), I =:= UUID ]),
-	[ gproc_lib:remove_reg({p, l, {?MODULE, K, UUID}}, Pid, unreg, []) || {Pid, K} <-  qlc:e(Q1) ],
-	Q2 = qlc:q([ {Pid, K, Ev} || {{p, l, {?MODULE, K, I, Ev}}, Pid, _} <- gproc:table({l, p}), I =:= UUID ]),
-	[ gproc_lib:remove_reg({p, l, {?MODULE, K, UUID, Ev}}, Pid, unreg, []) || {Pid, K, Ev} <-  qlc:e(Q2) ].
+	Q1 = qlc:q([ {Pid, K} || {{p, l, #call_subscribe{uuid=I}=K}, Pid, _} <- gproc:table({l, p}), I =:= UUID ]),
+	[ gproc_lib:remove_reg({p, l, K}, Pid, unreg, []) || {Pid, K} <-  qlc:e(Q1) ].
 
 hupall() -> [ hangup(UUID) || UUID <- active() ].
 answer() -> [ answer(UUID) || UUID <- active() ].
@@ -56,16 +56,16 @@ pid({?MODULE, UUID}) -> pid(UUID);
 pid(UUID) -> gproc:whereis_name({n, l, {?MODULE, UUID}}).
 wait(UUID) -> gproc:await({n, l, {?MODULE, UUID}}, 5000), UUID.
 
-subscribe(uuid, UUID) -> gen_safe:subscribe({?MODULE, uuid, UUID});
+subscribe(uuid, UUID) -> gen_safe:subscribe(#call_subscribe{uuid=UUID, type=uuid});
 subscribe(event, L) when is_list(L) -> [ subscribe(event, Ev) || Ev <- L ];
-subscribe(event, Event) -> gen_safe:subscribe({?MODULE, event, Event}).
+subscribe(event, Event) -> gen_safe:subscribe(#call_subscribe{event=Event, type=event}).
 subscribe(both, UUID, L) when is_list(L) -> [ subscribe(both, UUID, Ev) || Ev <- L ];
-subscribe(both, UUID, Event) -> gen_safe:subscribe({?MODULE, both, UUID, Event}).
-unsubscribe(uuid, UUID) -> gen_safe:unsubscribe({?MODULE, uuid, UUID});
+subscribe(both, UUID, Event) -> gen_safe:subscribe(#call_subscribe{type=both, uuid=UUID, event=Event}).
+unsubscribe(uuid, UUID) -> gen_safe:unsubscribe(#call_subscribe{uuid=UUID, type=uuid});
 unsubscribe(event, L) when is_list(L) -> [ unsubscribe(event, Ev) || Ev <- L ];
-unsubscribe(event, Event) -> gen_safe:unsubscribe({?MODULE, event, Event}).
+unsubscribe(event, Event) -> gen_safe:unsubscribe(#call_subscribe{type=event, event=Event}).
 unsubscribe(both, UUID, L) when is_list(L) -> [ unsubscribe(both, UUID, Ev) || Ev <- L ];
-unsubscribe(both, UUID, Event) -> gen_safe:unsubscribe({?MODULE, both, UUID, Event}).
+unsubscribe(both, UUID, Event) -> gen_safe:unsubscribe(#call_subscribe{type=both, uuid=UUID, event=Event}).
 
 vars(Id) -> gen_safe:call(Id, fun pid/1, vars).
 variables(Id) -> gen_safe:call(Id, fun pid/1, variables).
@@ -269,11 +269,11 @@ handle_event(Vars = #{ <<"Event-Name">> := Ev }, Variables, S=#state{fs=FsId, uu
 	{noreply, set_call_state(Vars, S)}.
 
 notify_uuid(FsId, UUID, Ev) ->
-	gproc:send({p, l, {?MODULE, uuid, UUID}}, #call_event{fs=FsId, uuid=UUID, event=Ev}).
+	gproc:send({p, l, #call_subscribe{uuid=UUID, type=uuid}}, #call_event{fs=FsId, uuid=UUID, event=Ev}).
 
 notify_event(FsId, UUID, Ev, Vars) ->
-	gproc:send({p, l, {?MODULE, both, UUID, Ev}}, #call_event{fs=FsId, uuid=UUID, event=Ev, vars=Vars}),
-	gproc:send({p, l, {?MODULE, event, Ev}}, #call_event{fs=FsId, uuid=UUID, event=Ev, vars=Vars}).
+	gproc:send({p, l, #call_subscribe{uuid=UUID, event=Ev, type=both}}, #call_event{fs=FsId, uuid=UUID, event=Ev, vars=Vars}),
+	gproc:send({p, l, #call_subscribe{event=Ev, type=event}}, #call_event{fs=FsId, uuid=UUID, event=Ev, vars=Vars}).
 
 set_call_state(#{ <<"Channel-Call-State">> := State }, S) -> S#state{ call_state = State };
 set_call_state(_, S) -> S.
