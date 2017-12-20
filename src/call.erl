@@ -13,7 +13,7 @@
 	execute/3, playback/2, tone_detect/4, detect_tone/2, stop_detect_tone/1,
 	bridge/2, transfer/3, record/3,
 	wait/1, wait_event/2, wait_event/3, wait_event_now/2, wait_event_now/3,
-	active/0, hupall/0, stop/0, answer/0, match_for/1, notify_uuid/3, stop/1
+	active/0, hupall/0, stop/0, answer/0, match_for/1, notify_uuid/3, stop/1, remove_subscribers/1
 ]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -29,6 +29,12 @@
 active() ->
 	Q = qlc:q([ UUID || {{n,l,{?MODULE,UUID}}, _Pid, _} <- gproc:table({l, n}) ]),
 	qlc:e(Q).
+
+remove_subscribers(UUID) ->
+	Q1 = qlc:q([ {Pid, K} || {{p, l, {?MODULE, K, I}}, Pid, _} <- gproc:table({l, p}), I =:= UUID ]),
+	[ gproc_lib:remove_reg({p, l, {?MODULE, K, UUID}}, Pid, unreg, []) || {Pid, K} <-  qlc:e(Q1) ],
+	Q2 = qlc:q([ {Pid, K, Ev} || {{p, l, {?MODULE, K, I, Ev}}, Pid, _} <- gproc:table({l, p}), I =:= UUID ]),
+	[ gproc_lib:remove_reg({p, l, {?MODULE, K, UUID, Ev}}, Pid, unreg, []) || {Pid, K, Ev} <-  qlc:e(Q2) ].
 
 hupall() -> [ hangup(UUID) || UUID <- active() ].
 answer() -> [ answer(UUID) || UUID <- active() ].
@@ -243,6 +249,7 @@ handle_call(_Request, _From, S=#state{uuid=_UUID}) ->
 
 terminate(_Reason, _S=#state{fs=Id, uuid=UUID, wait_hangup=WaitList}) ->
 	lager:info("~s terminate, reason:~p", [UUID, _Reason]),
+	remove_subscribers(UUID),
 	fswitch:api(Id, "uuid_kill ~s", [UUID]),
 	call_sup:on_hangup(UUID),
 	[ gen_server:reply(Caller, ok) || Caller <- WaitList ],
