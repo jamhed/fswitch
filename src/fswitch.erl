@@ -6,7 +6,7 @@
 	start_link/1, stop/1, alive/0, pid/1,
 	api/3, api/2, bgapi/3, bgapi/2, execute/4,
 	parse_uuid_dump/1, parse_uuid_dump_string/1,
-	stringify_opts/1, stringify_opts/2, stringify_opts/3
+	stringify_opts/1, stringify_opts/2, stringify_opts/3, subscribe/0, unsubscribe/0
 ]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
@@ -29,6 +29,9 @@ execute(Id, UUID, Command, Args) -> gen_server:call(pid(Id), {execute, UUID, Com
 pid(Pid) when is_pid(Pid) -> Pid;
 pid(Id) when is_list(Id) -> pid(erlang:list_to_atom(Id));
 pid(Id) -> gproc:whereis_name({n, l, {?MODULE, Id}}).
+
+subscribe() -> gproc:reg({p, l, ?MODULE}, subscribe).
+unsubscribe() -> gproc:unreg({p, l, ?MODULE}).
 
 alive() ->
 	Q = qlc:q([ Id || {{n,l,{?MODULE, Id}}, _Pid, _} <- gproc:table({l, n}) ]),
@@ -57,6 +60,7 @@ handle_info(node_check, S=#state{node=Node}) ->
 	case net_adm:ping(Node) of
 		pong ->
 			lager:notice("freeswitch node up:~p", [Node]),
+			gproc:send({p, l, ?MODULE}, {node_up, Node}),
 			erlang:monitor_node(Node, true);
 		_ ->
 			lager:info("freeswitch node is still down:~p", [Node]),
@@ -66,6 +70,7 @@ handle_info(node_check, S=#state{node=Node}) ->
 
 handle_info({nodedown, Node}, #state{}=S) ->
 	lager:error("freeswitch node down:~p", [Node]),
+	gproc:send({p, l, ?MODULE}, {node_down, Node}),
 	self() ! node_check,
 	{noreply, S};
 
