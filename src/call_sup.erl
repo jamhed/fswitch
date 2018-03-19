@@ -85,7 +85,7 @@ handle_cast(_Msg, S=#state{}) ->
 
 handle_call({originate, FsId, URL, Exten, Opts}, _From, S=#state{template=T, jobs=J}) ->
 	UUID = proplists:get_value(uuid, Opts, uuid()),
-	Opts1 = apply_opts(Opts, [
+	Opts1 = apply_opts(proplists:delete(uuid, Opts), [
 		{fun with_uuid/2, [UUID]},
 		{fun with_timeout/2, [proplists:get_value(originate_timeout, Opts, 5)]}
 	]),
