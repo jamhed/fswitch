@@ -32,4 +32,4 @@ In spite of all messages sent from `mod_erlang_event` being Erlang strings, this
 Notes
 =====
 
-This is currently work in progress, and a foundation of SIP functional testing application [busytone](https://github.com/jamhed/busytone).
+This is currently work in progress, and a foundation of SIP functional testing application [busytone](https://github.com/swarmcom/busytone).
